@@ -115,18 +115,29 @@ function App() {
   const [text, setText] = useState('');
   const [selectedLangs, setSelectedLangs] = useState([]);
   const [translations, setTranslations] = useState({});
+  const [isLoading, setIsLoading] = useState(false);
+  const [sourceLanguage, setSourceLanguage] = useState('en');
+  const [copied, setCopied] = useState('');
+ 
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
+    setCopied(text);
+    setTimeout(() => setCopied(''), 2000);
+  };
 
   const handleTranslate = async () => {
+    if (!text || selectedLangs.length === 0) return;
+    setIsLoading(true);
     const results = {};
     const API_KEY = 'REMOVED';
-
-    for (const lang of selectedLangs) {
-      try {
+ 
+    try {
+      for (const lang of selectedLangs) {
         const encodedParams = new URLSearchParams();
-        encodedParams.append("source_language", "en");
+        encodedParams.append("source_language", sourceLanguage);
         encodedParams.append("target_language", lang.value);
         encodedParams.append("text", text);
-
+ 
         const response = await fetch('https://text-translator2.p.rapidapi.com/translate', {
           method: 'POST',
           headers: {
@@ -138,106 +149,95 @@ function App() {
         });
         const data = await response.json();
         results[lang.value] = data.data.translatedText;
-      } catch (error) {
-        results[lang.value] = 'Translation failed';
       }
+    } catch (error) {
+      console.error('Translation failed:', error);
+    } finally {
+      setIsLoading(false);
+      setTranslations(results);
     }
-    setTranslations(results);
   };
 
   return (
     <div className="min-h-screen bg-gray-100">
-      <header className="bg-white shadow w-full">
-        <div className="w-full py-6 px-4">
+      <header className="bg-white shadow-md fixed top-0 w-full z-10">
+        <div className="max-w-7xl mx-auto py-6 px-4">
           <h1 className="text-3xl font-bold text-black">Multi-Language Translator</h1>
         </div>
       </header>
-
-      <main className="w-full py-6 px-4">
-        <div className="bg-white shadow rounded-lg p-6">
-          {/* Input Section */}
-          <div className="mb-8">
+ 
+      <main className="max-w-7xl mx-auto pt-24 px-4 pb-12">
+        <div className="bg-white shadow-lg rounded-xl p-6">
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Source Language</label>
+            <Select
+              value={languages.find(l => l.value === sourceLanguage)}
+              onChange={(option) => setSourceLanguage(option.value)}
+              options={languages}
+              className="mb-4"
+            />
+            
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               className="w-full p-4 border rounded-lg h-32 bg-white text-black focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter English text..."
+              placeholder="Enter text to translate..."
             />
           </div>
-
-          {/* Language Selection Form */}
-          <div className="mb-8">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleTranslate();
-              }}
+ 
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Target Languages</label>
+            <Select
+              isMulti
+              options={languages.filter(l => l.value !== 'auto')}
+              value={selectedLangs}
+              onChange={setSelectedLangs}
+              className="mb-4"
+            />
+ 
+            <button
+              onClick={handleTranslate}
+              disabled={!text || selectedLangs.length === 0 || isLoading}
+              className="w-full bg-blue-600 text-white p-3 rounded-lg font-medium 
+                         hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
+                         disabled:opacity-50 disabled:cursor-not-allowed
+                         transition duration-200"
             >
-              <label htmlFor="language-select" className="block text-xl font-semibold mb-2 text-black">
-                Select Languages
-              </label>
-              <Select
-                id="language-select"
-                isMulti
-                options={languages}
-                value={selectedLangs}
-                onChange={setSelectedLangs}
-                className="mb-4"
-                classNamePrefix="select"
-                placeholder="Choose languages..."
-                styles={{
-                  control: (base) => ({
-                    ...base,
-                    borderColor: '#d1d5db', // Tailwind's gray-300
-                    boxShadow: 'none',
-                    '&:hover': {
-                      borderColor: '#a1a1aa', // Tailwind's gray-400
-                    },
-                  }),
-                  multiValue: (base) => ({
-                    ...base,
-                    backgroundColor: '#bfdbfe', // Tailwind's blue-300
-                  }),
-                  multiValueLabel: (base) => ({
-                    ...base,
-                    color: '#1e40af', // Tailwind's blue-800
-                  }),
-                  multiValueRemove: (base) => ({
-                    ...base,
-                    color: '#1e40af',
-                    ':hover': {
-                      backgroundColor: '#93c5fd', // Tailwind's blue-400
-                      color: '#1e40af',
-                    },
-                  }),
-                }}
-              />
-
-              {/* Translate Button */}
-              <button
-                type="submit"
-                disabled={!text || selectedLangs.length === 0}
-                className="w-full bg-blue-600 text-white p-3 rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Translate
-              </button>
-            </form>
+              {isLoading ? 
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Translating...
+                </span> : 
+                'Translate'
+              }
+            </button>
           </div>
-
-          {/* Translations */}
+ 
           {Object.entries(translations).length > 0 && (
-            <div className="mt-8">
-              <h2 className="text-xl font-semibold mb-4 text-black">Translations</h2>
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-black">Translations</h2>
               <div className="grid gap-4 md:grid-cols-2">
                 {Object.entries(translations).map(([lang, translation]) => (
-                  <div
-                    key={lang}
-                    className="bg-white text-black p-4 rounded-lg border shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    <h3 className="font-medium text-lg text-black">
-                      {languages.find((l) => l.value === lang)?.label}
-                    </h3>
-                    <p className="text-black">{translation}</p>
+                  <div key={lang} 
+                       className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="font-medium text-black">
+                        {languages.find(l => l.value === lang)?.label}
+                      </h3>
+                      <button
+                        onClick={() => handleCopy(translation)}
+                        className={`px-3 py-1 rounded text-sm transition-colors
+                          ${copied === translation ? 
+                            'bg-green-100 text-green-800' : 
+                            'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                      >
+                        {copied === translation ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
+                    <p className="text-gray-800 break-words">{translation}</p>
                   </div>
                 ))}
               </div>
@@ -245,14 +245,14 @@ function App() {
           )}
         </div>
       </main>
-
-      <footer className="bg-white shadow mt-8 w-full">
-        <div className="w-full py-4 px-4 text-center text-black">
+ 
+      <footer className="bg-white shadow-md mt-8">
+        <div className="max-w-7xl mx-auto py-4 px-4 text-center text-gray-600">
           Created by Majid
         </div>
       </footer>
     </div>
   );
-}
-
-export default App;
+ }
+ 
+ export default App;
