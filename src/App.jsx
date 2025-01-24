@@ -128,17 +128,16 @@ function App() {
   const handleTranslate = async () => {
     if (!text || selectedLangs.length === 0) return;
     setIsLoading(true);
-    const results = {};
-    const API_KEY = 'REMOVED';
- 
+    const API_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
+  
     try {
-      for (const lang of selectedLangs) {
+      const translationPromises = selectedLangs.map(lang => {
         const encodedParams = new URLSearchParams();
         encodedParams.append("source_language", sourceLanguage);
         encodedParams.append("target_language", lang.value);
         encodedParams.append("text", text);
- 
-        const response = await fetch('https://text-translator2.p.rapidapi.com/translate', {
+  
+        return fetch('https://text-translator2.p.rapidapi.com/translate', {
           method: 'POST',
           headers: {
             'content-type': 'application/x-www-form-urlencoded',
@@ -146,17 +145,25 @@ function App() {
             'X-RapidAPI-Host': 'text-translator2.p.rapidapi.com'
           },
           body: encodedParams
-        });
-        const data = await response.json();
-        results[lang.value] = data.data.translatedText;
-      }
+        })
+          .then(response => response.json())
+          .then(data => ({ lang: lang.value, translation: data.data.translatedText }));
+      });
+  
+      const resultsArray = await Promise.all(translationPromises);
+      const results = resultsArray.reduce((acc, curr) => {
+        acc[curr.lang] = curr.translation;
+        return acc;
+      }, {});
+  
+      setTranslations(results);
     } catch (error) {
       console.error('Translation failed:', error);
     } finally {
       setIsLoading(false);
-      setTranslations(results);
     }
   };
+  
 
   return (
     <div className="min-h-screen bg-gray-100">
