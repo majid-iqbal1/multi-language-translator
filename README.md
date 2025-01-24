@@ -7,11 +7,7 @@
 - **Multiple Targets:** Choose one or more languages to translate your text into.
 - **Copy & Speak:** Easily copy translated text or listen to it using text-to-speech.
 - **History:** Keep track of your past translations for quick reference.
-
-## Use Cases
-- **Group Meetings:** Bridge language gaps in international team discussions.
-- **Traveling Abroad:** Navigate foreign countries with ease by translating signs and menus.
-- **Language Learning:** Enhance your studies by understanding translations of sentences.
+- **Group Meetings:** Bridge language gaps when meeting people who might not speak the common language.
 
 ## Get Started
 Visit [Multiple Language Translator](https://multi-language-translator-lyart.vercel.app/) and start translating today!
