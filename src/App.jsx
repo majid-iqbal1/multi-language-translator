@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import Select from 'react-select';
+import './App.css';
 
 const languages = [
+  { value: 'auto', label: 'Auto-Detect' },
   { value: 'af', label: 'Afrikaans' },
   { value: 'sq', label: 'Albanian' },
   { value: 'am', label: 'Amharic' },
@@ -116,8 +118,9 @@ function App() {
   const [selectedLangs, setSelectedLangs] = useState([]);
   const [translations, setTranslations] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceLanguage, setSourceLanguage] = useState('en');
+  const [sourceLanguage, setSourceLanguage] = useState('auto');
   const [copied, setCopied] = useState('');
+  const [history, setHistory] = useState([]);
 
   const API_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
 
@@ -156,20 +159,88 @@ function App() {
     setTimeout(() => setCopied(''), 2000);
   };
 
+  const handleLoadHistory = (entry) => {
+    setText(entry.sourceText);
+    setSourceLanguage(entry.sourceLanguage);
+    const targetLangOptions = languages.filter(l => entry.targetLanguages.includes(l.value));
+    setSelectedLangs(targetLangOptions);
+    setTranslations(entry.translatedTexts);
+  };
+
+  const handleClearHistory = () => {
+    if (window.confirm('Are you sure you want to clear your translation history?')) {
+      setHistory([]);
+    }
+  };
+
+  const handleSpeak = (text, lang) => {
+    if (!('speechSynthesis' in window)) {
+      alert('Sorry, your browser does not support text-to-speech.');
+      return;
+    }
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+
+    if (voices.length === 0) {
+      window.speechSynthesis.onvoiceschanged = () => {
+        const updatedVoices = window.speechSynthesis.getVoices();
+        const matchedVoice = updatedVoices.find(voice => voice.lang.startsWith(lang));
+        if (matchedVoice) {
+          utterance.voice = matchedVoice;
+        } else {
+          alert(`No voice available for language: ${lang}`);
+        }
+        window.speechSynthesis.speak(utterance);
+      };
+    } else {
+      const matchedVoice = voices.find(voice => voice.lang.startsWith(lang));
+      if (matchedVoice) {
+        utterance.voice = matchedVoice;
+      } else {
+        alert(`No voice available for language: ${lang}`);
+      }
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
   const handleTranslate = async () => {
     if (!text || selectedLangs.length === 0) return;
     setIsLoading(true);
     const results = {};
 
     try {
+      let detectedLanguage = sourceLanguage;
+
+      if (sourceLanguage === 'auto') {
+        const detectResponse = await fetch('https://libretranslate.de/detect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ q: text })
+        });
+
+        if (!detectResponse.ok) {
+          throw new Error('Language detection failed');
+        }
+
+        const detectData = await detectResponse.json();
+        if (detectData && detectData.length > 0) {
+          detectedLanguage = detectData[0].language;
+          setSourceLanguage(detectedLanguage);
+        } else {
+          alert('Could not detect the language. Please select the source language manually.');
+          throw new Error('Could not detect language');
+        }
+      }
+
       const translationPromises = selectedLangs.map(async (lang) => {
-        const cached = getCachedTranslation(sourceLanguage, lang.value, text);
+        const cached = getCachedTranslation(detectedLanguage, lang.value, text);
         if (cached) {
           return { lang: lang.value, translation: cached, fromCache: true };
         }
 
         const encodedParams = new URLSearchParams();
-        encodedParams.append("source_language", sourceLanguage);
+        encodedParams.append("source_language", detectedLanguage);
         encodedParams.append("target_language", lang.value);
         encodedParams.append("text", text);
 
@@ -190,8 +261,7 @@ function App() {
         const data = await response.json();
         const translatedText = data.data.translatedText;
 
-        setCachedTranslation(sourceLanguage, lang.value, text, translatedText);
-
+        setCachedTranslation(detectedLanguage, lang.value, text, translatedText);
         return { lang: lang.value, translation: translatedText, fromCache: false };
       });
 
@@ -201,6 +271,16 @@ function App() {
       });
 
       setTranslations(results);
+
+      const newHistoryEntry = {
+        id: Date.now(),
+        sourceText: text,
+        sourceLanguage: detectedLanguage,
+        targetLanguages: selectedLangs.map(lang => lang.value),
+        translatedTexts: results,
+        timestamp: new Date().toLocaleString()
+      };
+      setHistory([newHistoryEntry, ...history]);
     } catch (error) {
       console.error('Translation failed:', error);
       alert('An error occurred while translating. Please try again.');
@@ -210,16 +290,14 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
+    <div className="min-h-screen w-full bg-gray-100 flex flex-col">
       <header className="bg-white shadow-md fixed top-0 w-full z-10">
-        <div className="max-w-7xl mx-auto py-6 px-4">
+        <div className="max-w-7xl mx-auto py-6 px-4 flex justify-between items-center">
           <h1 className="text-3xl font-bold text-black">Multi-Language Translator</h1>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto pt-24 px-4 pb-12">
+      <main className="flex-grow max-w-7xl mx-auto pt-24 px-4 pb-12 w-full">
         <div className="bg-white shadow-lg rounded-xl p-6">
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">Source Language</label>
@@ -228,12 +306,14 @@ function App() {
               onChange={(option) => setSourceLanguage(option.value)}
               options={languages}
               className="mb-4"
+              classNamePrefix="react-select"
+              isSearchable
             />
 
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="w-full p-4 border rounded-lg h-32 bg-white text-black focus:ring-2 focus:ring-blue-500"
+              className="w-full p-4 border rounded-lg h-32 bg-white text-black focus:ring-2 focus:ring-blue-500 resize-none"
               placeholder="Enter text to translate..."
             />
           </div>
@@ -246,6 +326,8 @@ function App() {
               value={selectedLangs}
               onChange={setSelectedLangs}
               className="mb-4"
+              classNamePrefix="react-select"
+              isSearchable
             />
 
             <button
@@ -275,23 +357,73 @@ function App() {
               <h2 className="text-xl font-semibold text-black">Translations</h2>
               <div className="grid gap-4 md:grid-cols-2">
                 {Object.entries(translations).map(([lang, translation]) => (
-                  <div key={lang} 
-                       className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div key={lang} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex justify-between items-center mb-2">
                       <h3 className="font-medium text-black">
                         {languages.find(l => l.value === lang)?.label}
                       </h3>
-                      <button
-                        onClick={() => handleCopy(translation)}
-                        className={`px-3 py-1 rounded text-sm transition-colors
-                          ${copied === translation ? 
-                            'bg-green-100 text-green-800' : 
-                            'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
-                      >
-                        {copied === translation ? 'Copied!' : 'Copy'}
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleCopy(translation)}
+                          className={`px-3 py-1 rounded text-sm transition-colors
+                            ${copied === translation ? 
+                              'bg-green-100 text-green-800' : 
+                              'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                        >
+                          {copied === translation ? 'Copied!' : 'Copy'}
+                        </button>
+                        <button
+                          onClick={() => handleSpeak(translation, lang)}
+                          className="px-3 py-1 rounded text-sm bg-green-50 text-green-600 hover:bg-green-100 transition"
+                        >
+                          Speak
+                        </button>
+                      </div>
                     </div>
                     <p className="text-gray-800 break-words">{translation}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {history.length > 0 && (
+            <div className="mt-8">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold text-black">Translation History</h2>
+                <button
+                  onClick={handleClearHistory}
+                  className="px-3 py-1 bg-red-50 text-red-600 rounded text-sm hover:bg-red-100 transition"
+                >
+                  Clear History
+                </button>
+              </div>
+              <div className="space-y-4">
+                {history.map(entry => (
+                  <div key={entry.id} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-center mb-2">
+                      <div>
+                        <p className="text-sm text-gray-500">Translated on {entry.timestamp}</p>
+                        <h3 className="font-medium text-black">{entry.sourceLanguage.toUpperCase()}</h3>
+                      </div>
+                      <button
+                        onClick={() => handleLoadHistory(entry)}
+                        className="px-3 py-1 bg-blue-50 text-blue-600 rounded text-sm hover:bg-blue-100 transition"
+                      >
+                        Load
+                      </button>
+                    </div>
+                    <p className="text-gray-800 break-words mb-2"><strong>Source:</strong> {entry.sourceText}</p>
+                    <div>
+                      <strong>Translations:</strong>
+                      <ul className="list-disc list-inside mt-1">
+                        {Object.entries(entry.translatedTexts).map(([lang, translation]) => (
+                          <li key={lang}>
+                            <span className="font-medium">{languages.find(l => l.value === lang)?.label}:</span> {translation}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -300,10 +432,9 @@ function App() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="bg-white shadow-md mt-8">
         <div className="max-w-7xl mx-auto py-4 px-4 text-center text-gray-600">
-          Created by Majid
+          © 2025 Multi Language Translator. All Rights Reserved.
         </div>
       </footer>
     </div>
