@@ -118,7 +118,38 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [sourceLanguage, setSourceLanguage] = useState('en');
   const [copied, setCopied] = useState('');
- 
+
+  const API_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
+
+  const getCachedTranslation = (source, target, text) => {
+    const cacheKey = `${source}_${target}_${text}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (!cached) return null;
+
+    try {
+      const { translation, timestamp } = JSON.parse(cached);
+      const now = Date.now();
+      const cacheDuration = 24 * 60 * 60 * 1000;
+
+      if (now - timestamp > cacheDuration) {
+        localStorage.removeItem(cacheKey);
+        return null;
+      }
+
+      return translation;
+    } catch (error) {
+      console.error('Error parsing cached translation:', error);
+      localStorage.removeItem(cacheKey);
+      return null;
+    }
+  };
+
+  const setCachedTranslation = (source, target, text, translation) => {
+    const cacheKey = `${source}_${target}_${text}`;
+    const cacheValue = JSON.stringify({ translation, timestamp: Date.now() });
+    localStorage.setItem(cacheKey, cacheValue);
+  };
+
   const handleCopy = (text) => {
     navigator.clipboard.writeText(text);
     setCopied(text);
@@ -128,16 +159,21 @@ function App() {
   const handleTranslate = async () => {
     if (!text || selectedLangs.length === 0) return;
     setIsLoading(true);
-    const API_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
-  
+    const results = {};
+
     try {
-      const translationPromises = selectedLangs.map(lang => {
+      const translationPromises = selectedLangs.map(async (lang) => {
+        const cached = getCachedTranslation(sourceLanguage, lang.value, text);
+        if (cached) {
+          return { lang: lang.value, translation: cached, fromCache: true };
+        }
+
         const encodedParams = new URLSearchParams();
         encodedParams.append("source_language", sourceLanguage);
         encodedParams.append("target_language", lang.value);
         encodedParams.append("text", text);
-  
-        return fetch('https://text-translator2.p.rapidapi.com/translate', {
+
+        const response = await fetch('https://text-translator2.p.rapidapi.com/translate', {
           method: 'POST',
           headers: {
             'content-type': 'application/x-www-form-urlencoded',
@@ -145,34 +181,44 @@ function App() {
             'X-RapidAPI-Host': 'text-translator2.p.rapidapi.com'
           },
           body: encodedParams
-        })
-          .then(response => response.json())
-          .then(data => ({ lang: lang.value, translation: data.data.translatedText }));
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to translate to ${lang.label}`);
+        }
+
+        const data = await response.json();
+        const translatedText = data.data.translatedText;
+
+        setCachedTranslation(sourceLanguage, lang.value, text, translatedText);
+
+        return { lang: lang.value, translation: translatedText, fromCache: false };
       });
-  
+
       const resultsArray = await Promise.all(translationPromises);
-      const results = resultsArray.reduce((acc, curr) => {
-        acc[curr.lang] = curr.translation;
-        return acc;
-      }, {});
-  
+      resultsArray.forEach(({ lang, translation }) => {
+        results[lang] = translation;
+      });
+
       setTranslations(results);
     } catch (error) {
       console.error('Translation failed:', error);
+      alert('An error occurred while translating. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
-  
 
   return (
     <div className="min-h-screen bg-gray-100">
+      {/* Header */}
       <header className="bg-white shadow-md fixed top-0 w-full z-10">
         <div className="max-w-7xl mx-auto py-6 px-4">
           <h1 className="text-3xl font-bold text-black">Multi-Language Translator</h1>
         </div>
       </header>
- 
+
+      {/* Main Content */}
       <main className="max-w-7xl mx-auto pt-24 px-4 pb-12">
         <div className="bg-white shadow-lg rounded-xl p-6">
           <div className="mb-6">
@@ -183,7 +229,7 @@ function App() {
               options={languages}
               className="mb-4"
             />
-            
+
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
@@ -191,7 +237,7 @@ function App() {
               placeholder="Enter text to translate..."
             />
           </div>
- 
+
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">Target Languages</label>
             <Select
@@ -201,28 +247,29 @@ function App() {
               onChange={setSelectedLangs}
               className="mb-4"
             />
- 
+
             <button
               onClick={handleTranslate}
               disabled={!text || selectedLangs.length === 0 || isLoading}
               className="w-full bg-blue-600 text-white p-3 rounded-lg font-medium 
                          hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
                          disabled:opacity-50 disabled:cursor-not-allowed
-                         transition duration-200"
+                         transition duration-200 flex items-center justify-center"
             >
               {isLoading ? 
-                <span className="flex items-center justify-center">
+                <>
                   <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                   </svg>
                   Translating...
-                </span> : 
+                </>
+                : 
                 'Translate'
               }
             </button>
           </div>
- 
+
           {Object.entries(translations).length > 0 && (
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-black">Translations</h2>
@@ -252,7 +299,8 @@ function App() {
           )}
         </div>
       </main>
- 
+
+      {/* Footer */}
       <footer className="bg-white shadow-md mt-8">
         <div className="max-w-7xl mx-auto py-4 px-4 text-center text-gray-600">
           Created by Majid
@@ -260,6 +308,6 @@ function App() {
       </footer>
     </div>
   );
- }
- 
- export default App;
+}
+
+export default App;
