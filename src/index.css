@@ -2,10 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Removed max-width and centering from #root */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 #root {
-  padding: 0; /* Optional: Adjust padding as needed */
-  text-align: left; /* Optional: Change text alignment if needed */
+  text-align: left; 
 }
 
 .logo {
@@ -14,9 +19,11 @@
   will-change: filter;
   transition: filter 300ms;
 }
+
 .logo:hover {
   filter: drop-shadow(0 0 2em #646cffaa);
 }
+
 .logo.react:hover {
   filter: drop-shadow(0 0 2em #61dafbaa);
 }
