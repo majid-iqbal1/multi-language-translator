@@ -14,4 +14,4 @@
 - **Language Learning:** Enhance your studies by understanding translations of sentences.
 
 ## Get Started
-Visit [Mutiple Language Translator]([https://yourwebsite.com](https://vercel.com/majid-iqbal1s-projects/multi-language-translator) and start translating today!
+Visit [Mutiple Language Translator]([[https://yourwebsite.com](https://multi-language-translator-lyart.vercel.app/)]) and start translating today!
