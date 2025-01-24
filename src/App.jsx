@@ -1,19 +1,26 @@
 import { useState } from 'react'
 
-const languages = [
- { id: 'es', label: 'Spanish' },
- { id: 'fr', label: 'French' },
- { id: 'de', label: 'German' },
- { id: 'it', label: 'Italian' },
- { id: 'pt', label: 'Portuguese' },
- { id: 'ru', label: 'Russian' },
- { id: 'ja', label: 'Japanese' },
- { id: 'ko', label: 'Korean' },
- { id: 'hi', label: 'Hindi' },
- { id: 'ar', label: 'Arabic' },
- { id: 'nl', label: 'Dutch' },
- { id: 'pl', label: 'Polish' }
-]
+  const languages = [
+    { id: 'es', label: 'Spanish' },
+    { id: 'fr', label: 'French' },
+    { id: 'de', label: 'German' },
+    { id: 'it', label: 'Italian' },
+    { id: 'pt', label: 'Portuguese' },
+    { id: 'ru', label: 'Russian' },
+    { id: 'ja', label: 'Japanese' },
+    { id: 'ko', label: 'Korean' },
+    { id: 'hi', label: 'Hindi' },
+    { id: 'ar', label: 'Arabic' },
+    { id: 'nl', label: 'Dutch' },
+    { id: 'pl', label: 'Polish' },
+    { id: 'vi', label: 'Vietnamese' },
+    { id: 'zh-TW', label: 'Traditional Chinese' },
+    { id: 'rw', label: 'Kinyarwanda' },
+    { id: 'so', label: 'Somali' },
+    { id: 'sw', label: 'Swahili' },
+    { id: 'my', label: 'Burmese' },
+    { id: 'uk', label: 'Ukrainian' }
+   ]
 
 function App() {
  const [text, setText] = useState('')
