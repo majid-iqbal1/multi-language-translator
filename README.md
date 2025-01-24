@@ -2,7 +2,7 @@
 
 **Multi-Language Translator** is a user-friendly web app that helps you communicate effortlessly across different languages.
 
-![Translator App Screenshot](assets/readme.png)
+![Translator App Screenshot](src/assets/readme.png)
 
 ## Features
 - **Instant Translation:** Translate text in real-time between multiple languages.
