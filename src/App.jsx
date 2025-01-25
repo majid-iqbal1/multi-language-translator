@@ -1,6 +1,12 @@
+// App.jsx
 import React, { useState } from 'react';
 import Select from 'react-select';
+import { saveAs } from 'file-saver';
+import * as pdfjsLib from 'pdfjs-dist';
+import mammoth from 'mammoth';
 import './App.css';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const languages = [
   { value: 'af', label: 'Afrikaans' },
@@ -120,6 +126,8 @@ function App() {
   const [sourceLanguage, setSourceLanguage] = useState('en');
   const [copied, setCopied] = useState('');
   const [history, setHistory] = useState([]);
+  const [file, setFile] = useState(null);
+  const [translatedBlob, setTranslatedBlob] = useState(null);
 
   const API_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
 
@@ -127,17 +135,14 @@ function App() {
     const cacheKey = `${source}_${target}_${text}`;
     const cached = localStorage.getItem(cacheKey);
     if (!cached) return null;
-
     try {
       const { translation, timestamp } = JSON.parse(cached);
       const now = Date.now();
       const cacheDuration = 24 * 60 * 60 * 1000;
-
       if (now - timestamp > cacheDuration) {
         localStorage.removeItem(cacheKey);
         return null;
       }
-
       return translation;
     } catch (error) {
       console.error('Error parsing cached translation:', error);
@@ -164,6 +169,7 @@ function App() {
     const targetLangOptions = languages.filter(l => entry.targetLanguages.includes(l.value));
     setSelectedLangs(targetLangOptions);
     setTranslations(entry.translatedTexts);
+    setTranslatedBlob(null);
   };
 
   const handleClearHistory = () => {
@@ -177,10 +183,8 @@ function App() {
       alert('Sorry, your browser does not support text-to-speech.');
       return;
     }
-
     const utterance = new SpeechSynthesisUtterance(text);
     const voices = window.speechSynthesis.getVoices();
-
     if (voices.length === 0) {
       window.speechSynthesis.onvoiceschanged = () => {
         const updatedVoices = window.speechSynthesis.getVoices();
@@ -203,57 +207,94 @@ function App() {
     }
   };
 
+  const extractTextFromPDF = async (file) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let extractedText = '';
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const content = await page.getTextContent();
+      const strings = content.items.map(item => item.str);
+      extractedText += strings.join(' ') + '\n';
+    }
+    return extractedText;
+  };
+
+  const extractTextFromWord = async (file) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return result.value;
+  };
+
+  const handleFileUpload = async (e) => {
+    const uploadedFile = e.target.files[0];
+    if (!uploadedFile) return;
+    setFile(uploadedFile);
+    let extractedText = '';
+    if (uploadedFile.type === 'application/pdf') {
+      extractedText = await extractTextFromPDF(uploadedFile);
+    } else if (
+      uploadedFile.type ===
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      uploadedFile.type === 'application/msword'
+    ) {
+      extractedText = await extractTextFromWord(uploadedFile);
+    } else {
+      alert('Unsupported file format. Please upload a PDF or Word document.');
+      return;
+    }
+    setText(extractedText);
+    setTranslatedBlob(null);
+  };
+
+  const createTranslatedDocument = async (originalFileName, translations) => {
+    let blob;
+    const translatedText = Object.entries(translations)
+      .map(([lang, text]) => `--- ${lang} ---\n${text}\n`)
+      .join('\n');
+    if (originalFileName.endsWith('.pdf') || originalFileName.endsWith('.docx') || originalFileName.endsWith('.doc')) {
+      blob = new Blob([translatedText], { type: 'text/plain;charset=utf-8' });
+    }
+    return blob;
+  };
+
   const handleTranslate = async () => {
-    if (!text || selectedLangs.length === 0) return;
+    if ((!text && !file) || selectedLangs.length === 0) return;
     setIsLoading(true);
     const results = {};
-
     try {
       const translationPromises = selectedLangs.map(async (lang) => {
         const cached = getCachedTranslation(sourceLanguage, lang.value, text);
         if (cached) {
           return { lang: lang.value, translation: cached, fromCache: true };
         }
-
         const encodedParams = new URLSearchParams();
-        encodedParams.append("source_language", sourceLanguage);
-        encodedParams.append("target_language", lang.value);
-        encodedParams.append("text", text);
-
-        try {
-          const response = await fetch('https://text-translator2.p.rapidapi.com/translate', {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/x-www-form-urlencoded',
-              'X-RapidAPI-Key': API_KEY,
-              'X-RapidAPI-Host': 'text-translator2.p.rapidapi.com'
-            },
-            body: encodedParams
-          });
-
-          if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Failed to translate to ${lang.label}`);
-          }
-
-          const data = await response.json();
-          const translatedText = data.data.translatedText;
-
-          setCachedTranslation(sourceLanguage, lang.value, text, translatedText);
-
-          return { lang: lang.value, translation: translatedText, fromCache: false };
-        } catch (error) {
-          throw error;
+        encodedParams.append('source_language', sourceLanguage);
+        encodedParams.append('target_language', lang.value);
+        encodedParams.append('text', text);
+        const response = await fetch('https://text-translator2.p.rapidapi.com/translate', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/x-www-form-urlencoded',
+            'X-RapidAPI-Key': API_KEY,
+            'X-RapidAPI-Host': 'text-translator2.p.rapidapi.com'
+          },
+          body: encodedParams
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to translate to ${lang.label}: ${errorText}`);
         }
+        const data = await response.json();
+        const translatedText = data.data.translatedText;
+        setCachedTranslation(sourceLanguage, lang.value, text, translatedText);
+        return { lang: lang.value, translation: translatedText, fromCache: false };
       });
-
       const resultsArray = await Promise.all(translationPromises);
       resultsArray.forEach(({ lang, translation }) => {
         results[lang] = translation;
       });
-
       setTranslations(results);
-
       const newHistoryEntry = {
         id: Date.now(),
         sourceText: text,
@@ -263,11 +304,23 @@ function App() {
         timestamp: new Date().toLocaleString()
       };
       setHistory([newHistoryEntry, ...history]);
+      if (file) {
+        const translatedDoc = await createTranslatedDocument(file.name, results);
+        setTranslatedBlob(translatedDoc);
+      }
     } catch (error) {
       console.error('Translation failed:', error);
       alert('An error occurred while translating. Please try again.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleDownload = () => {
+    if (translatedBlob && file) {
+      const fileExtension = file.name.split('.').pop();
+      const translatedFileName = `Translated_${file.name.replace(`.${fileExtension}`, '')}.txt`;
+      saveAs(translatedBlob, translatedFileName);
     }
   };
 
@@ -301,6 +354,16 @@ function App() {
           </div>
 
           <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Document</label>
+            <input
+              type="file"
+              accept=".pdf, .docx, .doc"
+              onChange={handleFileUpload}
+              className="mb-4"
+            />
+          </div>
+
+          <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">Target Languages</label>
             <Select
               isMulti
@@ -314,7 +377,7 @@ function App() {
 
             <button
               onClick={handleTranslate}
-              disabled={!text || selectedLangs.length === 0 || isLoading}
+              disabled={(!text && !file) || selectedLangs.length === 0 || isLoading}
               className="w-full bg-blue-600 text-white p-3 rounded-lg font-medium 
                          hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
                          disabled:opacity-50 disabled:cursor-not-allowed
@@ -366,6 +429,19 @@ function App() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {translatedBlob && (
+            <div className="mt-6">
+              <button
+                onClick={handleDownload}
+                className="w-full bg-green-600 text-white p-3 rounded-lg font-medium 
+                           hover:bg-green-700 focus:ring-2 focus:ring-offset-2 focus:ring-green-500 
+                           transition duration-200 flex items-center justify-center"
+              >
+                Download Translated Document
+              </button>
             </div>
           )}
 
