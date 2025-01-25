@@ -24,7 +24,7 @@ const languages = [
   { value: 'cs', label: 'Czech' },
   { value: 'da', label: 'Danish' },
   { value: 'nl', label: 'Dutch' },
-  { value: 'en', label: 'English' }, // English is the default
+  { value: 'en', label: 'English' },
   { value: 'eo', label: 'Esperanto' },
   { value: 'et', label: 'Estonian' },
   { value: 'tl', label: 'Filipino' },
@@ -117,7 +117,7 @@ function App() {
   const [selectedLangs, setSelectedLangs] = useState([]);
   const [translations, setTranslations] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [sourceLanguage, setSourceLanguage] = useState('en'); // Default to English
+  const [sourceLanguage, setSourceLanguage] = useState('en');
   const [copied, setCopied] = useState('');
   const [history, setHistory] = useState([]);
 
@@ -131,7 +131,7 @@ function App() {
     try {
       const { translation, timestamp } = JSON.parse(cached);
       const now = Date.now();
-      const cacheDuration = 24 * 60 * 60 * 1000; 
+      const cacheDuration = 24 * 60 * 60 * 1000;
 
       if (now - timestamp > cacheDuration) {
         localStorage.removeItem(cacheKey);
@@ -212,11 +212,8 @@ function App() {
       const translationPromises = selectedLangs.map(async (lang) => {
         const cached = getCachedTranslation(sourceLanguage, lang.value, text);
         if (cached) {
-          console.log(`Using cached translation for ${lang.label}`);
           return { lang: lang.value, translation: cached, fromCache: true };
         }
-
-        console.log(`Translating to ${lang.label}...`);
 
         const encodedParams = new URLSearchParams();
         encodedParams.append("source_language", sourceLanguage);
@@ -236,20 +233,16 @@ function App() {
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error(`Translation to ${lang.label} failed:`, response.status, errorText);
             throw new Error(`Failed to translate to ${lang.label}`);
           }
 
           const data = await response.json();
-          console.log(`Translation Data for ${lang.label}:`, data);
-
           const translatedText = data.data.translatedText;
 
           setCachedTranslation(sourceLanguage, lang.value, text, translatedText);
 
           return { lang: lang.value, translation: translatedText, fromCache: false };
         } catch (error) {
-          console.error(`Error translating to ${lang.label}:`, error);
           throw error;
         }
       });
@@ -260,18 +253,16 @@ function App() {
       });
 
       setTranslations(results);
-      console.log('All Translations:', results);
 
       const newHistoryEntry = {
         id: Date.now(),
         sourceText: text,
-        sourceLanguage: sourceLanguage, 
+        sourceLanguage: sourceLanguage,
         targetLanguages: selectedLangs.map(lang => lang.value),
         translatedTexts: results,
         timestamp: new Date().toLocaleString()
       };
-      setHistory([newHistoryEntry, ...history]); 
-      console.log('Updated History:', [newHistoryEntry, ...history]);
+      setHistory([newHistoryEntry, ...history]);
     } catch (error) {
       console.error('Translation failed:', error);
       alert('An error occurred while translating. Please try again.');
@@ -305,7 +296,7 @@ function App() {
               value={text}
               onChange={(e) => setText(e.target.value)}
               className="w-full p-4 border rounded-lg h-32 bg-white text-black focus:ring-2 focus:ring-blue-500 resize-none"
-              placeholder="Enter text in English to translate..."
+              placeholder="Enter text to translate..."
             />
           </div>
 
@@ -313,7 +304,7 @@ function App() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Target Languages</label>
             <Select
               isMulti
-              options={languages.filter(l => l.value !== 'en')} 
+              options={languages.filter(l => l.value !== sourceLanguage)}
               value={selectedLangs}
               onChange={setSelectedLangs}
               className="mb-4"
@@ -425,7 +416,7 @@ function App() {
 
       <footer className="bg-white shadow-md mt-8">
         <div className="max-w-7xl mx-auto py-4 px-4 text-center text-gray-600">
-          © 2025 Bridging the language Gap. Developed by Majid
+          © 2025 Multi Language Translator. All Rights Reserved.
         </div>
       </footer>
     </div>
