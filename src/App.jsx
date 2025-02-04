@@ -492,7 +492,7 @@ function App() {
 
       <footer className="bg-white shadow-md mt-8">
         <div className="max-w-7xl mx-auto py-4 px-4 text-center text-gray-600">
-          © 2025 Multi Language Translator. All Rights Reserved.
+          © 2025 Multi Language Translator. Created by Majid
         </div>
       </footer>
     </div>
