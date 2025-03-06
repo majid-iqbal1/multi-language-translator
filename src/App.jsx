@@ -131,7 +131,7 @@ function App() {
   const [translatedBlob, setTranslatedBlob] = useState(null);
 
   // Google Translate API Key
-  const GOOGLE_API_KEY = 'REMOVED';
+  const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
   const getCachedTranslation = (source, target, text) => {
     const cacheKey = `${source}_${target}_${text}`;
