@@ -12,6 +12,7 @@ const languages = [
   { value: 'af', label: 'Afrikaans' },
   { value: 'sq', label: 'Albanian' },
   { value: 'am', label: 'Amharic' },
+  { value: 'bal', label: 'Balochi' },
   { value: 'ar', label: 'Arabic' },
   { value: 'hy', label: 'Armenian' },
   { value: 'az', label: 'Azerbaijani' },
@@ -129,7 +130,8 @@ function App() {
   const [file, setFile] = useState(null);
   const [translatedBlob, setTranslatedBlob] = useState(null);
 
-  const API_KEY = import.meta.env.VITE_RAPIDAPI_KEY;
+  // Google Translate API Key
+  const GOOGLE_API_KEY = 'AIzaSyCRFG7syUmFstKKzFIPzkgDL1S4RKpJu3I';
 
   const getCachedTranslation = (source, target, text) => {
     const cacheKey = `${source}_${target}_${text}`;
@@ -268,28 +270,36 @@ function App() {
         if (cached) {
           return { lang: lang.value, translation: cached, fromCache: true };
         }
-        const encodedParams = new URLSearchParams();
-        encodedParams.append('source_language', sourceLanguage);
-        encodedParams.append('target_language', lang.value);
-        encodedParams.append('text', text);
-        const response = await fetch('https://text-translator2.p.rapidapi.com/translate', {
+        
+        // Google Translate API endpoint
+        const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
+        
+        const requestBody = {
+          q: text,
+          source: sourceLanguage,
+          target: lang.value,
+          format: 'text'
+        };
+        
+        const response = await fetch(url, {
           method: 'POST',
           headers: {
-            'content-type': 'application/x-www-form-urlencoded',
-            'X-RapidAPI-Key': API_KEY,
-            'X-RapidAPI-Host': 'text-translator2.p.rapidapi.com'
+            'Content-Type': 'application/json',
           },
-          body: encodedParams
+          body: JSON.stringify(requestBody)
         });
+        
         if (!response.ok) {
           const errorText = await response.text();
           throw new Error(`Failed to translate to ${lang.label}: ${errorText}`);
         }
+        
         const data = await response.json();
-        const translatedText = data.data.translatedText;
+        const translatedText = data.data.translations[0].translatedText;
         setCachedTranslation(sourceLanguage, lang.value, text, translatedText);
         return { lang: lang.value, translation: translatedText, fromCache: false };
       });
+      
       const resultsArray = await Promise.all(translationPromises);
       resultsArray.forEach(({ lang, translation }) => {
         results[lang] = translation;
