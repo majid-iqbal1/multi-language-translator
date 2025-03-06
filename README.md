@@ -1,6 +1,6 @@
 # [Multiple Language Translator](https://multi-language-translator-lyart.vercel.app/)
 
-**Multi-Language Translator** is a user-friendly web app that enables translation into multiple languages, supporting up to 107 languages, to facilitate communication with just a single click.
+**Multi-Language Translator** is a user-friendly web app that enables translation into multiple languages, supporting up to 108 languages, to facilitate communication with just a single click.
 
 ![Translator App Screenshot](src/assets/readme.png)
 
