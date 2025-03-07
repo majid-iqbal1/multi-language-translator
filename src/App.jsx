@@ -4,6 +4,7 @@ import Select from 'react-select';
 import { saveAs } from 'file-saver';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
+import PersianTTS from './PersianTTS'; // Import the PersianTTS component
 import './App.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -427,12 +428,18 @@ function App() {
                         >
                           {copied === translation ? 'Copied!' : 'Copy'}
                         </button>
-                        <button
-                          onClick={() => handleSpeak(translation, lang)}
-                          className="px-3 py-1 rounded text-sm bg-green-50 text-green-600 hover:bg-green-100 transition"
-                        >
-                          Speak
-                        </button>
+                        
+                        {/* Use PersianTTS for Balochi language */}
+                        {lang === 'bal' ? (
+                          <PersianTTS text={translation} />
+                        ) : (
+                          <button
+                            onClick={() => handleSpeak(translation, lang)}
+                            className="px-3 py-1 rounded text-sm bg-green-50 text-green-600 hover:bg-green-100 transition"
+                          >
+                            Speak
+                          </button>
+                        )}
                       </div>
                     </div>
                     <p className="text-gray-800 break-words">{translation}</p>
