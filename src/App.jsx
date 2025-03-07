@@ -4,7 +4,7 @@ import Select from 'react-select';
 import { saveAs } from 'file-saver';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
-import PersianTTS from './PersianTTS'; // Import the PersianTTS component
+import PersianTTS from './UrduTTS'; // Import the PersianTTS component
 import './App.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;

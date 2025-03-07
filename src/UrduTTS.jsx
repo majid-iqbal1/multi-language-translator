@@ -1,7 +1,7 @@
-// PersianTTS.jsx
+// UrduTTS.jsx
 import React, { useState, useEffect } from 'react';
 
-const PersianTTS = ({ text }) => {
+const UrduTTS = ({ text }) => {
   const [availableVoices, setAvailableVoices] = useState([]);
   const [selectedVoice, setSelectedVoice] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -17,17 +17,21 @@ const PersianTTS = ({ text }) => {
     const loadVoices = () => {
       const voices = window.speechSynthesis.getVoices();
       
-      // Filter for Persian, Arabic, or Urdu voices
-      const persianRelatedVoices = voices.filter(voice => 
-        voice.lang.includes('fa') || voice.lang.includes('ar') || voice.lang.includes('ur')
+      // Filter for Urdu, Arabic, Hindi, or Persian voices - with priority given to Urdu
+      const priorityVoices = voices.filter(voice => 
+        voice.lang.includes('ur') || // Urdu
+        voice.lang.includes('hi') || // Hindi (phonetically similar)
+        voice.lang.includes('ar') || // Arabic
+        voice.lang.includes('fa')    // Persian
       );
       
-      setAvailableVoices(persianRelatedVoices.length > 0 ? persianRelatedVoices : voices);
+      setAvailableVoices(priorityVoices.length > 0 ? priorityVoices : voices);
       
-      // Set default voice (prefer Persian if available)
-      if (persianRelatedVoices.length > 0) {
-        const persianVoice = persianRelatedVoices.find(voice => voice.lang.includes('fa'));
-        setSelectedVoice(persianVoice || persianRelatedVoices[0]);
+      // Set default voice (prefer Urdu if available)
+      if (priorityVoices.length > 0) {
+        const urduVoice = priorityVoices.find(voice => voice.lang.includes('ur'));
+        const hindiVoice = priorityVoices.find(voice => voice.lang.includes('hi'));
+        setSelectedVoice(urduVoice || hindiVoice || priorityVoices[0]);
       } else if (voices.length > 0) {
         setSelectedVoice(voices[0]);
       }
@@ -104,9 +108,10 @@ const PersianTTS = ({ text }) => {
             ))}
           </select>
           <p className="text-xs text-gray-500 mt-1">
-            Using {selectedVoice?.lang.includes('fa') ? 'Persian' : 
+            Using {selectedVoice?.lang.includes('ur') ? 'Urdu' : 
+                   selectedVoice?.lang.includes('hi') ? 'Hindi' :
                    selectedVoice?.lang.includes('ar') ? 'Arabic' : 
-                   selectedVoice?.lang.includes('ur') ? 'Urdu' : 'default'} voice
+                   selectedVoice?.lang.includes('fa') ? 'Persian' : 'default'} voice
           </p>
         </div>
       )}
@@ -114,4 +119,4 @@ const PersianTTS = ({ text }) => {
   );
 };
 
-export default PersianTTS;
+export default UrduTTS;
