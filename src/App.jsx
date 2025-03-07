@@ -4,7 +4,6 @@ import Select from 'react-select';
 import { saveAs } from 'file-saver';
 import * as pdfjsLib from 'pdfjs-dist';
 import mammoth from 'mammoth';
-import PersianTTS from './UrduTTS'; // Import the PersianTTS component
 import './App.css';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -131,7 +130,6 @@ function App() {
   const [file, setFile] = useState(null);
   const [translatedBlob, setTranslatedBlob] = useState(null);
 
-  // Google Translate API Key
   const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
   const getCachedTranslation = (source, target, text) => {
@@ -428,18 +426,12 @@ function App() {
                         >
                           {copied === translation ? 'Copied!' : 'Copy'}
                         </button>
-                        
-                        {/* Use PersianTTS for Balochi language */}
-                        {lang === 'bal' ? (
-                          <PersianTTS text={translation} />
-                        ) : (
-                          <button
-                            onClick={() => handleSpeak(translation, lang)}
-                            className="px-3 py-1 rounded text-sm bg-green-50 text-green-600 hover:bg-green-100 transition"
-                          >
-                            Speak
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleSpeak(translation, lang)}
+                          className="px-3 py-1 rounded text-sm bg-green-50 text-green-600 hover:bg-green-100 transition"
+                        >
+                          Speak
+                        </button>
                       </div>
                     </div>
                     <p className="text-gray-800 break-words">{translation}</p>
