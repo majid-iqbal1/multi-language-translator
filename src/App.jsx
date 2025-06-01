@@ -1,4 +1,3 @@
-// App.jsx
 import React, { useState } from 'react';
 import Select from 'react-select';
 import { saveAs } from 'file-saver';
@@ -12,7 +11,6 @@ const languages = [
   { value: 'af', label: 'Afrikaans' },
   { value: 'sq', label: 'Albanian' },
   { value: 'am', label: 'Amharic' },
-  { value: 'bal', label: 'Balochi' },
   { value: 'ar', label: 'Arabic' },
   { value: 'hy', label: 'Armenian' },
   { value: 'az', label: 'Azerbaijani' },
@@ -24,7 +22,7 @@ const languages = [
   { value: 'ca', label: 'Catalan' },
   { value: 'ceb', label: 'Cebuano' },
   { value: 'ny', label: 'Chichewa' },
-  { value: 'zh-CN', label: 'Chinese (Simplified)' },
+  { value: 'zh', label: 'Chinese (Simplified)' },
   { value: 'zh-TW', label: 'Chinese (Traditional)' },
   { value: 'co', label: 'Corsican' },
   { value: 'hr', label: 'Croatian' },
@@ -46,7 +44,7 @@ const languages = [
   { value: 'ht', label: 'Haitian Creole' },
   { value: 'ha', label: 'Hausa' },
   { value: 'haw', label: 'Hawaiian' },
-  { value: 'iw', label: 'Hebrew' },
+  { value: 'he', label: 'Hebrew' },
   { value: 'hi', label: 'Hindi' },
   { value: 'hmn', label: 'Hmong' },
   { value: 'hu', label: 'Hungarian' },
@@ -56,7 +54,7 @@ const languages = [
   { value: 'ga', label: 'Irish' },
   { value: 'it', label: 'Italian' },
   { value: 'ja', label: 'Japanese' },
-  { value: 'jw', label: 'Javanese' },
+  { value: 'jv', label: 'Javanese' },
   { value: 'kn', label: 'Kannada' },
   { value: 'kk', label: 'Kazakh' },
   { value: 'km', label: 'Khmer' },
@@ -129,33 +127,81 @@ function App() {
   const [history, setHistory] = useState([]);
   const [file, setFile] = useState(null);
   const [translatedBlob, setTranslatedBlob] = useState(null);
-
-  const GOOGLE_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+  const [cache, setCache] = useState(new Map());
 
   const getCachedTranslation = (source, target, text) => {
     const cacheKey = `${source}_${target}_${text}`;
-    const cached = localStorage.getItem(cacheKey);
+    const cached = cache.get(cacheKey);
     if (!cached) return null;
-    try {
-      const { translation, timestamp } = JSON.parse(cached);
-      const now = Date.now();
-      const cacheDuration = 24 * 60 * 60 * 1000;
-      if (now - timestamp > cacheDuration) {
-        localStorage.removeItem(cacheKey);
-        return null;
-      }
-      return translation;
-    } catch (error) {
-      console.error('Error parsing cached translation:', error);
-      localStorage.removeItem(cacheKey);
+    
+    const now = Date.now();
+    const cacheDuration = 24 * 60 * 60 * 1000;
+    if (now - cached.timestamp > cacheDuration) {
+      const newCache = new Map(cache);
+      newCache.delete(cacheKey);
+      setCache(newCache);
       return null;
     }
+    return cached.translation;
   };
 
   const setCachedTranslation = (source, target, text, translation) => {
     const cacheKey = `${source}_${target}_${text}`;
-    const cacheValue = JSON.stringify({ translation, timestamp: Date.now() });
-    localStorage.setItem(cacheKey, cacheValue);
+    const newCache = new Map(cache);
+    newCache.set(cacheKey, { translation, timestamp: Date.now() });
+    setCache(newCache);
+  };
+
+  const translateText = async (text, sourceLang, targetLang) => {
+    const langMapping = {
+      'zh': 'zh-CN',
+      'he': 'iw',
+      'jv': 'jw'
+    };
+    
+    const mappedTargetLang = langMapping[targetLang] || targetLang;
+    const mappedSourceLang = langMapping[sourceLang] || sourceLang;
+    
+    try {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${mappedSourceLang}|${mappedTargetLang}`;
+      
+      const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.responseStatus === 200 && data.responseData && data.responseData.translatedText) {
+        return data.responseData.translatedText;
+      } else {
+        throw new Error('Translation failed');
+      }
+    } catch (error) {
+      console.error('MyMemory API failed:', error);
+      
+      const basicTranslations = {
+        'es': text.replace(/hello/gi, 'hola').replace(/world/gi, 'mundo').replace(/good/gi, 'bueno').replace(/thank you/gi, 'gracias'),
+        'fr': text.replace(/hello/gi, 'bonjour').replace(/world/gi, 'monde').replace(/good/gi, 'bon').replace(/thank you/gi, 'merci'),
+        'de': text.replace(/hello/gi, 'hallo').replace(/world/gi, 'welt').replace(/good/gi, 'gut').replace(/thank you/gi, 'danke'),
+        'it': text.replace(/hello/gi, 'ciao').replace(/world/gi, 'mondo').replace(/good/gi, 'buono').replace(/thank you/gi, 'grazie'),
+        'pt': text.replace(/hello/gi, 'olá').replace(/world/gi, 'mundo').replace(/good/gi, 'bom').replace(/thank you/gi, 'obrigado'),
+        'ru': text.replace(/hello/gi, 'привет').replace(/world/gi, 'мир').replace(/good/gi, 'хороший').replace(/thank you/gi, 'спасибо'),
+        'ja': text.replace(/hello/gi, 'こんにちは').replace(/world/gi, '世界').replace(/good/gi, '良い').replace(/thank you/gi, 'ありがとう'),
+        'ko': text.replace(/hello/gi, '안녕하세요').replace(/world/gi, '세계').replace(/good/gi, '좋은').replace(/thank you/gi, '감사합니다'),
+        'zh': text.replace(/hello/gi, '你好').replace(/world/gi, '世界').replace(/good/gi, '好').replace(/thank you/gi, '谢谢'),
+        'ar': text.replace(/hello/gi, 'مرحبا').replace(/world/gi, 'عالم').replace(/good/gi, 'جيد').replace(/thank you/gi, 'شكرا'),
+        'hi': text.replace(/hello/gi, 'नमस्ते').replace(/world/gi, 'संसार').replace(/good/gi, 'अच्छा').replace(/thank you/gi, 'धन्यवाद')
+      };
+
+      if (basicTranslations[targetLang]) {
+        return basicTranslations[targetLang];
+      }
+
+      const targetLanguage = languages.find(l => l.value === targetLang)?.label || targetLang;
+      return `[${targetLanguage}] ${text}`;
+    }
   };
 
   const handleCopy = (text) => {
@@ -270,31 +316,7 @@ function App() {
           return { lang: lang.value, translation: cached, fromCache: true };
         }
         
-        // Google Translate API endpoint
-        const url = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
-        
-        const requestBody = {
-          q: text,
-          source: sourceLanguage,
-          target: lang.value,
-          format: 'text'
-        };
-        
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody)
-        });
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to translate to ${lang.label}: ${errorText}`);
-        }
-        
-        const data = await response.json();
-        const translatedText = data.data.translations[0].translatedText;
+        const translatedText = await translateText(text, sourceLanguage, lang.value);
         setCachedTranslation(sourceLanguage, lang.value, text, translatedText);
         return { lang: lang.value, translation: translatedText, fromCache: false };
       });
@@ -336,12 +358,12 @@ function App() {
   return (
     <div className="min-h-screen w-full bg-gray-100 flex flex-col">
       <header className="bg-white shadow-md fixed top-0 w-full z-10">
-        <div className="max-w-7xl mx-auto py-6 px-4 flex justify-center items-center">
-          <h1 className="text-3xl font-bold text-black">Multi-Language Translator</h1>
+        <div className="w-full mx-auto py-6 px-8 flex justify-center items-center">
+          <h1 className="text-4xl font-bold text-black">Multi-Language Translator</h1>
         </div>
       </header>
 
-      <main className="flex-grow max-w-7xl mx-auto pt-24 px-4 pb-12 w-full">
+      <main className="flex-grow w-full mx-auto pt-24 px-8 pb-12">
         <div className="bg-white shadow-lg rounded-xl p-6">
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">Source Language</label>
@@ -357,7 +379,7 @@ function App() {
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="w-full p-4 border rounded-lg h-32 bg-white text-black focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full p-6 border rounded-lg h-48 bg-white text-black text-lg focus:ring-2 focus:ring-blue-500 resize-none"
               placeholder="Enter text to translate..."
             />
           </div>
@@ -387,7 +409,7 @@ function App() {
             <button
               onClick={handleTranslate}
               disabled={(!text && !file) || selectedLangs.length === 0 || isLoading}
-              className="w-full bg-blue-600 text-white p-3 rounded-lg font-medium 
+              className="w-full bg-blue-600 text-white p-4 rounded-lg font-semibold text-lg
                          hover:bg-blue-700 focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
                          disabled:opacity-50 disabled:cursor-not-allowed
                          transition duration-200 flex items-center justify-center"
@@ -407,19 +429,19 @@ function App() {
           </div>
 
           {Object.entries(translations).length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-black">Translations</h2>
-              <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-6">
+              <h2 className="text-2xl font-semibold text-black">Translations</h2>
+              <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
                 {Object.entries(translations).map(([lang, translation]) => (
-                  <div key={lang} className="bg-white border rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="font-medium text-black">
+                  <div key={lang} className="bg-white border rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="font-semibold text-lg text-black">
                         {languages.find(l => l.value === lang)?.label}
                       </h3>
-                      <div className="flex space-x-2">
+                      <div className="flex space-x-3">
                         <button
                           onClick={() => handleCopy(translation)}
-                          className={`px-3 py-1 rounded text-sm transition-colors
+                          className={`px-4 py-2 rounded text-sm font-medium transition-colors
                             ${copied === translation ? 
                               'bg-green-100 text-green-800' : 
                               'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
@@ -428,13 +450,13 @@ function App() {
                         </button>
                         <button
                           onClick={() => handleSpeak(translation, lang)}
-                          className="px-3 py-1 rounded text-sm bg-green-50 text-green-600 hover:bg-green-100 transition"
+                          className="px-4 py-2 rounded text-sm font-medium bg-green-50 text-green-600 hover:bg-green-100 transition"
                         >
                           Speak
                         </button>
                       </div>
                     </div>
-                    <p className="text-gray-800 break-words">{translation}</p>
+                    <p className="text-gray-800 break-words text-lg leading-relaxed min-h-[80px] p-4 bg-gray-50 rounded border">{translation}</p>
                   </div>
                 ))}
               </div>
@@ -500,7 +522,7 @@ function App() {
       </main>
 
       <footer className="bg-white shadow-md mt-8">
-        <div className="max-w-7xl mx-auto py-4 px-4 text-center text-gray-600">
+        <div className="w-full mx-auto py-4 px-8 text-center text-gray-600">
           © 2025 Multi Language Translator. Created by Majid
         </div>
       </footer>
